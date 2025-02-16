@@ -160,32 +160,33 @@ final class CameraModel: Camera {
         }
     }
     
-    // MARK: - Video capture
-    /// A Boolean value that indicates whether the camera captures video in HDR format.
+    // MARK: - 비디오 촬영
+
+    /// 카메라가 HDR 형식으로 비디오를 촬영할지 여부를 나타내는 Boolean 값입니다.
     var isHDRVideoEnabled = false {
         didSet {
             guard status == .running, captureMode == .video else { return }
             Task {
                 await captureService.setHDRVideoEnabled(isHDRVideoEnabled)
-                // Update the persistent state value.
+                // 지속 상태(persistent state) 값을 업데이트합니다.
                 cameraState.isVideoHDREnabled = isHDRVideoEnabled
             }
         }
     }
-    
-    /// Toggles the state of recording.
+
+    /// 녹화 상태를 전환합니다.
     func toggleRecording() async {
         switch await captureService.captureActivity {
         case .movieCapture:
             do {
-                // If currently recording, stop the recording and write the movie to the library.
+                // 현재 녹화 중이면 녹화를 중지하고 동영상을 라이브러리에 저장합니다.
                 let movie = try await captureService.stopRecording()
                 try await mediaLibrary.save(movie: movie)
             } catch {
                 self.error = error
             }
         default:
-            // In any other case, start recording.
+            // 그 외의 경우에는 녹화를 시작합니다.
             await captureService.startRecording()
         }
     }

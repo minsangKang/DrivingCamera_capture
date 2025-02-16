@@ -191,32 +191,32 @@ final class CameraModel: Camera {
         }
     }
     
-    // MARK: - Internal state observations
-    
-    // Set up camera's state observations.
+    // MARK: - 내부 상태 관찰
+
+    /// 카메라의 상태를 관찰하도록 설정합니다.
     private func observeState() {
         Task {
-            // Await new thumbnails that the media library generates when saving a file.
+            // 미디어 라이브러리가 파일을 저장할 때 생성하는 새 썸네일을 대기합니다.
             for await thumbnail in mediaLibrary.thumbnails.compactMap({ $0 }) {
                 self.thumbnail = thumbnail
             }
         }
         
         Task {
-            // Await new capture activity values from the capture service.
+            // 캡처 서비스에서 전달하는 새로운 캡처 활동 상태를 대기합니다.
             for await activity in await captureService.$captureActivity.values {
                 if activity.willCapture {
-                    // Flash the screen to indicate capture is starting.
+                    // 촬영이 시작됨을 알리기 위해 화면을 깜빡입니다.
                     flashScreen()
                 } else {
-                    // Forward the activity to the UI.
+                    // 캡처 상태를 UI에 반영합니다.
                     captureActivity = activity
                 }
             }
         }
         
         Task {
-            // Await updates to the capabilities that the capture service advertises.
+            // 캡처 서비스에서 제공하는 기능 업데이트를 대기합니다.
             for await capabilities in await captureService.$captureCapabilities.values {
                 isHDRVideoSupported = capabilities.isHDRSupported
                 cameraState.isVideoHDRSupported = capabilities.isHDRSupported
@@ -224,13 +224,14 @@ final class CameraModel: Camera {
         }
         
         Task {
-            // Await updates to a person's interaction with the Camera Control HUD.
+            // 사용자가 카메라 컨트롤 HUD와 상호작용하는 상태 업데이트를 대기합니다.
             for await isShowingFullscreenControls in await captureService.$isShowingFullscreenControls.values {
                 withAnimation {
-                    // Prefer showing a minimized UI when capture controls enter a fullscreen appearance.
+                    // 캡처 컨트롤이 전체 화면 모드로 전환되면 UI를 최소화하도록 설정합니다.
                     prefersMinimizedUI = isShowingFullscreenControls
                 }
             }
         }
     }
+
 }

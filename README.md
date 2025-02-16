@@ -1,3 +1,19 @@
+# DrivingCamera_capture
+드라이빙 영상을 찍기 위한 핵심 기능 - 동영상 캡쳐 샘플 프로젝트
+## 목표
+- 4k 60hz 동영상 및 음성을 녹화할 수 있다.
+- 카메라 화각을 설정할 수 있다.
+- 해상도 및 hz를 설정할 수 있다.
+- HDR 여부를 설정할 수 있다.
+
+## 방식
+- 애플의 AVCam 샘플 프로젝트 소스코드를 기반으로 구현 ([샘플 프로젝트 링크](https://developer.apple.com/documentation/avfoundation/avcam-building-a-camera-app))
+- 한글 주석으로 변경하며 프로젝트가 어떻게 구현되어 있는지를 분석 및 공부
+- 위 목표사항들 구현
+- 이후 State, Action 기반 단방향 아키텍쳐가 가능하도록 개선
+
+---
+
 # AVCam: Building a camera app
 Capture photos and record video using the front and rear iPhone and iPad cameras.
 

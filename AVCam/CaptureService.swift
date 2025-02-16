@@ -129,7 +129,7 @@ actor CaptureService {
             try addInput(for: defaultMic)
 
             // Configure the session preset based on the current capture mode.
-            captureSession.sessionPreset = captureMode == .photo ? .photo : .high
+            captureSession.sessionPreset = captureMode == .photo ? .photo : .hd4K3840x2160
             // Add the photo capture output as the default output type.
             try addOutput(photoCapture.output)
             // If the capture mode is set to Video, add a movie capture output.
@@ -270,7 +270,7 @@ actor CaptureService {
             captureSession.sessionPreset = .photo
             captureSession.removeOutput(movieCapture.output)
         case .video:
-            captureSession.sessionPreset = .high
+            captureSession.sessionPreset = .hd4K3840x2160
             try addOutput(movieCapture.output)
             if isHDRVideoEnabled {
                 setHDRVideoEnabled(true)
@@ -497,7 +497,7 @@ actor CaptureService {
                 currentDevice.unlockForConfiguration()
                 isHDRVideoEnabled = true
             } else {
-                captureSession.sessionPreset = .high
+                captureSession.sessionPreset = .hd4K3840x2160
                 isHDRVideoEnabled = false
             }
         } catch {

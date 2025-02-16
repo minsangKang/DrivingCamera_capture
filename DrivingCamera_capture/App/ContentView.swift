@@ -7,7 +7,6 @@
 
 import SwiftUI
 import AVFoundation
-import UIKit
 
 struct ContentView: View {
     @State private var isRecording = false
@@ -32,8 +31,8 @@ struct ContentView: View {
                 .foregroundColor(.white)
                 .clipShape(Capsule())
             }
-            .padding()
         }
+        .padding(1)
     }
 }
 

@@ -8,15 +8,27 @@
 import UIKit
 import AVFoundation
 
-class CameraViewController: UIViewController {
-    var captureSession: AVCaptureSession?
-    var videoPreviewLayer: AVCaptureVideoPreviewLayer?
-    var videoOutput: AVCaptureMovieFileOutput?
-    var outputURL: URL?
+import SnapKit
+import Then
+
+final class CameraViewController: UIViewController {
+    private var captureSession: AVCaptureSession?
+    private var videoPreviewLayer: AVCaptureVideoPreviewLayer?
+    private var videoOutput: AVCaptureMovieFileOutput?
+    private var outputURL: URL?
     
-    override func viewDidLoad() {
-        super.viewDidLoad()
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
         self.setupCamera()
+    }
+    
+    override func viewWillLayoutSubviews() {
+        super.viewWillLayoutSubviews()
+    }
+    
+    override func viewWillTransition(to size: CGSize, with coordinator: any UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        self.view.layer.sublayers?.removeAll()
     }
 }
 
@@ -26,7 +38,6 @@ extension CameraViewController {
     private func setupCamera() {
         // captureSession 생성
         let captureSession = AVCaptureSession()
-        captureSession.sessionPreset = .high
         self.captureSession = captureSession
         
         // captureDevice 생성
@@ -42,6 +53,7 @@ extension CameraViewController {
         // captureDeviceInput 생성
         do {
             captureSession.beginConfiguration()
+            captureSession.sessionPreset = .hd4K3840x2160
             
             // video
             let videoInput = try AVCaptureDeviceInput(device: videoCaptureDevice)
@@ -69,12 +81,14 @@ extension CameraViewController {
         
         // captureVideoPreviewLayer 생성
         let previewLayer = AVCaptureVideoPreviewLayer(session: captureSession)
-        previewLayer.videoGravity = .resizeAspectFill
+        previewLayer.videoGravity = .resizeAspect
         previewLayer.frame = self.view.layer.bounds
         self.view.layer.addSublayer(previewLayer)
         
-        videoPreviewLayer = previewLayer
-        captureSession.startRunning()
+        self.videoPreviewLayer = previewLayer
+        DispatchQueue.global(qos: .background).async {
+            captureSession.startRunning()
+        }
     }
     
     public func startRecording() {
@@ -95,6 +109,38 @@ extension CameraViewController {
         let tempDir = FileManager.default.temporaryDirectory
         let fileName = UUID().uuidString + ".mov"
         return tempDir.appendingPathComponent(fileName)
+    }
+    
+    // 현재 디바이스 방향을 기반으로 회전 각도 반환
+    func currentRotationAngle() -> CGFloat {
+        switch UIDevice.current.orientation {
+        case .portrait:
+            return 0
+        case .portraitUpsideDown:
+            return 180
+        case .landscapeLeft:
+            return 90
+        case .landscapeRight:
+            return 270
+        default:
+            return 0  // 기본값
+        }
+    }
+    
+    // 현재 디바이스 방향을 AVCaptureVideoOrientation으로 변환하는 함수
+    func currentVideoOrientation() -> AVCaptureVideoOrientation {
+        switch UIDevice.current.orientation {
+        case .portrait:
+            return .portrait
+        case .portraitUpsideDown:
+            return .portraitUpsideDown
+        case .landscapeLeft:
+            return .landscapeRight
+        case .landscapeRight:
+            return .landscapeLeft
+        default:
+            return .portrait  // 기본값
+        }
     }
 }
 

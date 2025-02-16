@@ -118,9 +118,9 @@ final class CameraModel: Camera {
         await captureService.selectNextVideoDevice()
     }
     
-    // MARK: - Photo capture
-    
-    /// Captures a photo and writes it to the user's Photos library.
+    // MARK: - 사진 촬영
+
+    /// 사진을 촬영하고 사용자의 사진 보관함(Photos 라이브러리)에 저장합니다.
     func capturePhoto() async {
         do {
             let photoFeatures = PhotoFeatures(isLivePhotoEnabled: isLivePhotoEnabled, qualityPrioritization: qualityPrioritization)
@@ -130,29 +130,29 @@ final class CameraModel: Camera {
             self.error = error
         }
     }
-    
-    /// A Boolean value that indicates whether to capture Live Photos when capturing stills.
+
+    /// 정지 사진 촬영 시 Live Photo를 캡처할지 여부를 나타내는 Boolean 값입니다.
     var isLivePhotoEnabled = true {
         didSet {
-            // Update the persistent state value.
+            // 지속 상태 값을 업데이트합니다.
             cameraState.isLivePhotoEnabled = isLivePhotoEnabled
         }
     }
-    
-    /// A value that indicates how to balance the photo capture quality versus speed.
+
+    /// 사진 촬영 품질과 속도의 균형을 설정하는 값을 나타냅니다.
     var qualityPrioritization = QualityPrioritization.quality {
         didSet {
-            // Update the persistent state value.
+            // 지속 상태(persistent state) 값을 업데이트합니다.
             cameraState.qualityPrioritization = qualityPrioritization
         }
     }
-    
-    /// Performs a focus and expose operation at the specified screen point.
+
+    /// 지정된 화면 지점에서 초점 및 노출을 조정하는 작업을 수행합니다.
     func focusAndExpose(at point: CGPoint) async {
         await captureService.focusAndExpose(at: point)
     }
-    
-    /// Sets the `showCaptureFeedback` state to indicate that capture is underway.
+
+    /// 촬영 중임을 나타내도록 `showCaptureFeedback` 상태를 설정합니다.
     private func flashScreen() {
         shouldFlashScreen = true
         withAnimation(.linear(duration: 0.01)) {

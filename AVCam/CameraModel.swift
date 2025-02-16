@@ -1,61 +1,60 @@
 /*
-See the LICENSE.txt file for this sample’s licensing information.
+이 샘플의 라이선스 정보는 LICENSE.txt 파일을 참조하세요.
 
-Abstract:
-An object that provides the interface to the features of the camera.
+개요:
+카메라 기능에 대한 인터페이스를 제공하는 객체.
 */
 
 import SwiftUI
 import Combine
 
-/// An object that provides the interface to the features of the camera.
+/// 카메라 기능에 대한 인터페이스를 제공하는 객체.
 ///
-/// This object provides the default implementation of the `Camera` protocol, which defines the interface
-/// to configure the camera hardware and capture media. `CameraModel` doesn't perform capture itself, but is an
-/// `@Observable` type that mediates interactions between the app's SwiftUI views and `CaptureService`.
+/// 이 객체는 `Camera` 프로토콜의 기본 구현을 제공하며, 카메라 하드웨어를 설정하고 미디어를 캡처하는
+/// 인터페이스를 정의합니다. `CameraModel` 자체적으로 캡처를 수행하지 않으며, `@Observable` 타입으로서
+/// 앱의 SwiftUI 뷰와 `CaptureService` 간의 상호작용을 중재합니다.
 ///
-/// For SwiftUI previews and Simulator, the app uses `PreviewCameraModel` instead.
-///
+/// SwiftUI 미리보기 및 시뮬레이터에서는 `PreviewCameraModel`을 대신 사용합니다.
 @Observable
 final class CameraModel: Camera {
     
-    /// The current status of the camera, such as unauthorized, running, or failed.
+    /// 카메라의 현재 상태(예: unauthorized, running, failed)를 나타냅니다.
     private(set) var status = CameraStatus.unknown
-    
-    /// The current state of photo or movie capture.
+
+    /// 사진 또는 동영상 캡처의 현재 상태를 나타냅니다.
     private(set) var captureActivity = CaptureActivity.idle
-    
-    /// A Boolean value that indicates whether the app is currently switching video devices.
+
+    /// 앱이 현재 비디오 장치를 전환 중인지 여부를 나타내는 Boolean 값입니다.
     private(set) var isSwitchingVideoDevices = false
-    
-    /// A Boolean value that indicates whether the camera prefers showing a minimized set of UI controls.
+
+    /// 카메라가 최소화된 UI 컨트롤 세트를 선호하는지 여부를 나타내는 Boolean 값입니다.
     private(set) var prefersMinimizedUI = false
-    
-    /// A Boolean value that indicates whether the app is currently switching capture modes.
+
+    /// 앱이 현재 촬영 모드를 전환 중인지 여부를 나타내는 Boolean 값입니다.
     private(set) var isSwitchingModes = false
-    
-    /// A Boolean value that indicates whether to show visual feedback when capture begins.
+
+    /// 촬영이 시작될 때 시각적 피드백을 표시할지 여부를 나타내는 Boolean 값입니다.
     private(set) var shouldFlashScreen = false
-    
-    /// A thumbnail for the last captured photo or video.
+
+    /// 마지막으로 촬영된 사진 또는 동영상의 썸네일 이미지입니다.
     private(set) var thumbnail: CGImage?
-    
-    /// An error that indicates the details of an error during photo or movie capture.
+
+    /// 사진 또는 동영상 캡처 중 발생한 오류의 세부 정보를 포함하는 에러 객체입니다.
     private(set) var error: Error?
-    
-    /// An object that provides the connection between the capture session and the video preview layer.
+
+    /// 캡처 세션과 비디오 미리보기 레이어 간의 연결을 제공하는 객체입니다.
     var previewSource: PreviewSource { captureService.previewSource }
-    
-    /// A Boolean that indicates whether the camera supports HDR video recording.
+
+    /// 카메라가 HDR 비디오 녹화를 지원하는지 여부를 나타내는 Boolean 값입니다.
     private(set) var isHDRVideoSupported = false
-    
-    /// An object that saves captured media to a person's Photos library.
+
+    /// 촬영한 미디어를 사용자의 사진 보관함(Photos 라이브러리)에 저장하는 객체입니다.
     private let mediaLibrary = MediaLibrary()
-    
-    /// An object that manages the app's capture functionality.
+
+    /// 앱의 촬영 기능을 관리하는 객체입니다.
     private let captureService = CaptureService()
-    
-    /// Persistent state shared between the app and capture extension.
+
+    /// 앱과 캡처 확장(capture extension) 간에 공유되는 지속 상태(persistent state)입니다.
     private var cameraState = CameraState()
     
     init() {

@@ -1,8 +1,8 @@
 /*
-See the LICENSE.txt file for this sample’s licensing information.
+이 샘플의 라이선스 정보는 LICENSE.txt 파일을 참조하세요.
 
-Abstract:
-A sample app that shows how to a use the AVFoundation capture APIs to perform media capture.
+개요:
+AVFoundation 캡처 API를 사용하여 미디어 캡처를 수행하는 방법을 보여주는 샘플 앱입니다.
 */
 
 import os

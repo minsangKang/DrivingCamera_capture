@@ -149,9 +149,9 @@ fastlane/test_output
 iOSInjectionProject/
 
 ### SwiftPackageManager ###
-Packages
-xcuserdata
-*.xcodeproj
+#Packages
+#xcuserdata
+#*.xcodeproj
 
 
 ### Xcode ###
@@ -159,7 +159,7 @@ xcuserdata
 ## Xcode 8 and earlier
 
 ### Xcode Patch ###
-*.xcodeproj/*
+#*.xcodeproj/*
 #!*.xcodeproj/project.pbxproj
 #!*.xcodeproj/xcshareddata/
 #!*.xcodeproj/project.xcworkspace/

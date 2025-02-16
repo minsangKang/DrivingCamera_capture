@@ -61,30 +61,31 @@ final class CameraModel: Camera {
         //
     }
     
-    // MARK: - Starting the camera
-    /// Start the camera and begin the stream of data.
+    // MARK: - 카메라 시작
+    
+    /// 카메라를 시작하고 데이터 스트림을 시작합니다.
     func start() async {
-        // Verify that the person authorizes the app to use device cameras and microphones.
+        // 사용자가 앱에 장치의 카메라 및 마이크 사용을 허용했는지 확인합니다.
         guard await captureService.isAuthorized else {
             status = .unauthorized
             return
         }
         do {
-            // Synchronize the state of the model with the persistent state.
+            // 모델의 상태를 지속 상태(persistent state)와 동기화합니다.
             await syncState()
-            // Start the capture service to start the flow of data.
+            // 캡처 서비스를 시작하여 데이터 스트림을 시작합니다.
             try await captureService.start(with: cameraState)
             observeState()
             status = .running
         } catch {
-            logger.error("Failed to start capture service. \(error)")
+            logger.error("🚨 캡처 서비스 시작 실패: \(error)")
             status = .failed
         }
     }
-    
-    /// Synchronizes the persistent camera state.
+
+    /// 지속적인 카메라 상태를 동기화합니다.
     ///
-    /// `CameraState` represents the persistent state, such as the capture mode, that the app and extension share.
+    /// `CameraState`는 앱과 확장(extension)에서 공유하는 캡처 모드와 같은 지속적인 상태를 나타냅니다.
     func syncState() async {
         cameraState = await CameraState.current
         captureMode = cameraState.captureMode
@@ -92,25 +93,25 @@ final class CameraModel: Camera {
         isLivePhotoEnabled = cameraState.isLivePhotoEnabled
         isHDRVideoEnabled = cameraState.isVideoHDREnabled
     }
-    
-    // MARK: - Changing modes and devices
-    
-    /// A value that indicates the mode of capture for the camera.
+
+    // MARK: - 모드 및 장치 변경
+
+    /// 카메라의 캡처 모드를 나타내는 값입니다.
     var captureMode = CaptureMode.photo {
         didSet {
             guard status == .running else { return }
             Task {
                 isSwitchingModes = true
                 defer { isSwitchingModes = false }
-                // Update the configuration of the capture service for the new mode.
+                // 새로운 모드에 맞게 캡처 서비스의 설정을 업데이트합니다.
                 try? await captureService.setCaptureMode(captureMode)
-                // Update the persistent state value.
+                // 지속 상태(persistent state) 값을 업데이트합니다.
                 cameraState.captureMode = captureMode
             }
         }
     }
-    
-    /// Selects the next available video device for capture.
+
+    /// 사용 가능한 다음 비디오 장치를 선택하여 캡처 장치를 전환합니다.
     func switchVideoDevices() async {
         isSwitchingVideoDevices = true
         defer { isSwitchingVideoDevices = false }

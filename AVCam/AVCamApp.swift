@@ -9,13 +9,14 @@ import os
 import SwiftUI
 
 @main
-/// The AVCam app's main entry point.
+/// AVCam 앱의 진입점
 struct AVCamApp: App {
 
-    // Simulator doesn't support the AVFoundation capture APIs. Use the preview camera when running in Simulator.
+    // 시뮬레이터에서는 AVFoundation 캡처 API를 지원하지 않습니다.
+    // 시뮬레이터에서 실행할 때는 미리보기 카메라를 사용하세요.
     @State private var camera = CameraModel()
     
-    // An indication of the scene's operational state.
+    // scene의 동작 상태를 나타내는 환경 변수.
     @Environment(\.scenePhase) var scenePhase
     
     var body: some Scene {
@@ -23,11 +24,11 @@ struct AVCamApp: App {
             CameraView(camera: camera)
                 .statusBarHidden(true)
                 .task {
-                    // Start the capture pipeline.
+                    // 캡처 파이프라인을 시작합니다.
                     await camera.start()
                 }
-                // Monitor the scene phase. Synchronize the persistent state when
-                // the camera is running and the app becomes active.
+                // scene 상태 변화를 감지합니다.
+                // 카메라가 실행 중이고 앱이 활성화되면 지속 상태를 동기화합니다.
                 .onChange(of: scenePhase) { _, newPhase in
                     guard camera.status == .running, newPhase == .active else { return }
                     Task { @MainActor in
@@ -38,5 +39,5 @@ struct AVCamApp: App {
     }
 }
 
-/// A global logger for the app.
+///  앱에서 사용할 전역 로거.
 let logger = Logger()

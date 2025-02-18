@@ -1,9 +1,9 @@
 /*
-이 샘플의 라이선스 정보는 LICENSE.txt 파일을 참조하세요.
-
-개요:
-카메라 기능에 대한 인터페이스를 제공하는 객체.
-*/
+ 이 샘플의 라이선스 정보는 LICENSE.txt 파일을 참조하세요.
+ 
+ 개요:
+ 카메라 기능에 대한 인터페이스를 제공하는 객체.
+ */
 
 import SwiftUI
 import Combine
@@ -20,40 +20,40 @@ final class CameraModel: Camera {
     
     /// 카메라의 현재 상태(예: unauthorized, running, failed)를 나타냅니다.
     private(set) var status = CameraStatus.unknown
-
+    
     /// 사진 또는 동영상 캡처의 현재 상태를 나타냅니다.
     private(set) var captureActivity = CaptureActivity.idle
-
+    
     /// 앱이 현재 비디오 장치를 전환 중인지 여부를 나타내는 Boolean 값입니다.
     private(set) var isSwitchingVideoDevices = false
-
+    
     /// 카메라가 최소화된 UI 컨트롤 세트를 선호하는지 여부를 나타내는 Boolean 값입니다.
     private(set) var prefersMinimizedUI = false
-
+    
     /// 앱이 현재 촬영 모드를 전환 중인지 여부를 나타내는 Boolean 값입니다.
     private(set) var isSwitchingModes = false
-
+    
     /// 촬영이 시작될 때 시각적 피드백을 표시할지 여부를 나타내는 Boolean 값입니다.
     private(set) var shouldFlashScreen = false
-
+    
     /// 마지막으로 촬영된 사진 또는 동영상의 썸네일 이미지입니다.
     private(set) var thumbnail: CGImage?
-
+    
     /// 사진 또는 동영상 캡처 중 발생한 오류의 세부 정보를 포함하는 에러 객체입니다.
     private(set) var error: Error?
-
+    
     /// 캡처 세션과 비디오 미리보기 레이어 간의 연결을 제공하는 객체입니다.
     var previewSource: PreviewSource { captureService.previewSource }
-
+    
     /// 카메라가 HDR 비디오 녹화를 지원하는지 여부를 나타내는 Boolean 값입니다.
     private(set) var isHDRVideoSupported = false
-
+    
     /// 촬영한 미디어를 사용자의 사진 보관함(Photos 라이브러리)에 저장하는 객체입니다.
     private let mediaLibrary = MediaLibrary()
-
+    
     /// 앱의 촬영 기능을 관리하는 객체입니다.
     private let captureService = CaptureService()
-
+    
     /// 앱과 캡처 확장(capture extension) 간에 공유되는 지속 상태(persistent state)입니다.
     private var cameraState = CameraState()
     
@@ -82,7 +82,7 @@ final class CameraModel: Camera {
             status = .failed
         }
     }
-
+    
     /// 지속적인 카메라 상태를 동기화합니다.
     ///
     /// `CameraState`는 앱과 확장(extension)에서 공유하는 캡처 모드와 같은 지속적인 상태를 나타냅니다.
@@ -93,9 +93,9 @@ final class CameraModel: Camera {
         isLivePhotoEnabled = cameraState.isLivePhotoEnabled
         isHDRVideoEnabled = cameraState.isVideoHDREnabled
     }
-
+    
     // MARK: - 모드 및 장치 변경
-
+    
     /// 카메라의 캡처 모드를 나타내는 값입니다.
     var captureMode = CaptureMode.photo {
         didSet {
@@ -110,7 +110,7 @@ final class CameraModel: Camera {
             }
         }
     }
-
+    
     /// 사용 가능한 다음 비디오 장치를 선택하여 캡처 장치를 전환합니다.
     func switchVideoDevices() async {
         isSwitchingVideoDevices = true
@@ -119,7 +119,7 @@ final class CameraModel: Camera {
     }
     
     // MARK: - 사진 촬영
-
+    
     /// 사진을 촬영하고 사용자의 사진 보관함(Photos 라이브러리)에 저장합니다.
     func capturePhoto() async {
         do {
@@ -130,7 +130,7 @@ final class CameraModel: Camera {
             self.error = error
         }
     }
-
+    
     /// 정지 사진 촬영 시 Live Photo를 캡처할지 여부를 나타내는 Boolean 값입니다.
     var isLivePhotoEnabled = true {
         didSet {
@@ -138,7 +138,7 @@ final class CameraModel: Camera {
             cameraState.isLivePhotoEnabled = isLivePhotoEnabled
         }
     }
-
+    
     /// 사진 촬영 품질과 속도의 균형을 설정하는 값을 나타냅니다.
     var qualityPrioritization = QualityPrioritization.quality {
         didSet {
@@ -146,12 +146,12 @@ final class CameraModel: Camera {
             cameraState.qualityPrioritization = qualityPrioritization
         }
     }
-
+    
     /// 지정된 화면 지점에서 초점 및 노출을 조정하는 작업을 수행합니다.
     func focusAndExpose(at point: CGPoint) async {
         await captureService.focusAndExpose(at: point)
     }
-
+    
     /// 촬영 중임을 나타내도록 `showCaptureFeedback` 상태를 설정합니다.
     private func flashScreen() {
         shouldFlashScreen = true
@@ -161,7 +161,7 @@ final class CameraModel: Camera {
     }
     
     // MARK: - 비디오 촬영
-
+    
     /// 카메라가 HDR 형식으로 비디오를 촬영할지 여부를 나타내는 Boolean 값입니다.
     var isHDRVideoEnabled = false {
         didSet {
@@ -173,7 +173,7 @@ final class CameraModel: Camera {
             }
         }
     }
-
+    
     /// 녹화 상태를 전환합니다.
     func toggleRecording() async {
         switch await captureService.captureActivity {
@@ -192,7 +192,7 @@ final class CameraModel: Camera {
     }
     
     // MARK: - 내부 상태 관찰
-
+    
     /// 카메라의 상태를 관찰하도록 설정합니다.
     private func observeState() {
         Task {
@@ -233,5 +233,5 @@ final class CameraModel: Camera {
             }
         }
     }
-
+    
 }

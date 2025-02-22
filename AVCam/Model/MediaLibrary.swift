@@ -1,67 +1,66 @@
 /*
-See the LICENSE.txt file for this sample’s licensing information.
-
-Abstract:
-An object that writes photos and movies to the user's Photos library.
-*/
+ 이 샘플의 라이선스 정보는 LICENSE.txt 파일을 참조하세요.
+ 
+ 개요:
+ 사용자 사진 라이브러리에 사진과 영상을 저장하는 객체.
+ */
 
 import Foundation
 import Photos
 import UIKit
 
-/// An object that writes photos and movies to the user's Photos library.
+/// 사용자 사진 라이브러리에 사진과 영상을 저장하는 객체.
 actor MediaLibrary {
     
-    // Errors that media library can throw.
+    // 미디어 라이브러리가 발생시킬 수 있는 오류들.
     enum Error: Swift.Error {
         case unauthorized
         case saveFailed
     }
     
-    /// An asynchronous stream of thumbnail images the app generates after capturing media.
+    /// 앱이 미디어를 캡처한 후 생성하는 썸네일 이미지를 비동기 스트림으로 제공.
     let thumbnails: AsyncStream<CGImage?>
     private let continuation: AsyncStream<CGImage?>.Continuation?
     
-    /// Creates a new media library object.
+    /// 새로운 미디어 라이브러리 객체를 생성.
     init() {
         let (thumbnails, continuation) = AsyncStream.makeStream(of: CGImage?.self)
         self.thumbnails = thumbnails
         self.continuation = continuation
     }
     
-    // MARK: - Authorization
+    // MARK: - 권한 관리
     
     private var isAuthorized: Bool {
         get async {
             let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
-            /// Determine whether the user has previously authorized `PHPhotoLibrary` access.
+            /// 사용자가 `PHPhotoLibrary` 접근을 허용했는지 여부 확인.
             var isAuthorized = status == .authorized
-            // If the system hasn't determined the user's authorization status,
-            // explicitly prompt them for approval.
+            // 시스템이 사용자의 권한 상태를 아직 결정하지 않은 경우 명시적으로 승인을 요청.
             if status == .notDetermined {
-                // Request authorization to add media to the library.
+                // 사진 라이브러리에 미디어를 추가할 수 있도록 권한 요청.
                 let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
                 isAuthorized = status == .authorized
             }
             return isAuthorized
         }
     }
-
-    // MARK: - Saving media
     
-    /// Saves a photo to the Photos library.
+    // MARK: - 미디어 저장
+    
+    /// 사진을 사진 라이브러리에 저장.
     func save(photo: Photo) async throws {
         let location = try await currentLocation
         try await performChange {
             let creationRequest = PHAssetCreationRequest.forAsset()
             
-            // Save primary photo.
+            // 기본 사진 저장.
             let options = PHAssetResourceCreationOptions()
-            // Specify the appropriate resource type for the photo.
+            // 사진에 적합한 리소스 유형 지정.
             creationRequest.addResource(with: photo.isProxy ? .photoProxy : .photo, data: photo.data, options: options)
             creationRequest.location = location
             
-            // Save Live Photo data.
+            // Live Photo 데이터 저장.
             if let url = photo.livePhotoMovieURL {
                 let livePhotoOptions = PHAssetResourceCreationOptions()
                 livePhotoOptions.shouldMoveFile = true
@@ -72,7 +71,7 @@ actor MediaLibrary {
         }
     }
     
-    /// Saves a movie to the Photos library.
+    /// 영상를 사진 라이브러리에 저장.
     func save(movie: Movie) async throws {
         let location = try await currentLocation
         try await performChange {
@@ -85,7 +84,7 @@ actor MediaLibrary {
         }
     }
     
-    // A template method for writing a change to the user's photo library.
+    // 사용자 사진 라이브러리에 변경을 기록하는 템플릿 메소드.
     private func performChange(_ change: @Sendable @escaping () -> PHObjectPlaceholder?) async throws {
         guard await isAuthorized else {
             throw Error.unauthorized
@@ -94,12 +93,12 @@ actor MediaLibrary {
         do {
             var placeholder: PHObjectPlaceholder?
             try await PHPhotoLibrary.shared().performChanges {
-                // Execute the change closure.
+                // 변경 클로저 실행.
                 placeholder = change()
             }
             
             if let placeholder {
-                /// Retrieve the newly created `PHAsset` instance.
+                /// 새로 생성된 `PHAsset` 인스턴스를 가져옵니다.
                 guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [placeholder.localIdentifier],
                                                       options: nil).firstObject else { return }
                 await createThumbnail(for: asset)
@@ -109,11 +108,11 @@ actor MediaLibrary {
         }
     }
     
-    // MARK: - Thumbnail handling
+    // MARK: - 썸네일 처리
     
     private func loadInitialThumbnail() async {
-        // Only load an initial thumbnail if the user has already authorized the app to write to the Photos library.
-        // Deferring this call prevents the app from prompting for Photos authorization when the app starts.
+        // 사용자가 이미 앱에 Photos 라이브러리 쓰기 권한을 허용한 경우에만 초기 썸네일을 로드합니다.
+        // 이 호출을 지연시켜 앱 시작 시 Photos 권한 요청이 뜨지 않도록 합니다.
         guard PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized else { return }
         
         let options = PHFetchOptions()
@@ -124,18 +123,18 @@ actor MediaLibrary {
     }
     
     private func createThumbnail(for asset: PHAsset) async {
-        // Request the generation of a 256x256 thumbnail image.
+        // 256x256 크기의 썸네일 이미지를 생성 요청.
         PHImageManager.default().requestImage(for: asset,
                                               targetSize: .init(width: 256, height: 256),
                                               contentMode: .default,
                                               options: nil) { [weak self] image, _ in
-            // Set the latest thumbnail image.
+            // 최신 썸네일 이미지 설정.
             guard let self, let image = image else { return }
             continuation?.yield(image.cgImage)
         }
     }
     
-    // MARK: - Location management
+    // MARK: - 위치 관리
     
     private let locationManager = CLLocationManager()
     
@@ -144,9 +143,8 @@ actor MediaLibrary {
             if locationManager.authorizationStatus == .notDetermined {
                 locationManager.requestWhenInUseAuthorization()
             }
-            // Return the location for the first update.
+            // 첫 번째 위치 업데이트를 반환.
             return try await CLLocationUpdate.liveUpdates().first(where: { _ in true })?.location
         }
     }
 }
-

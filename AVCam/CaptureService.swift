@@ -1,93 +1,91 @@
 /*
-See the LICENSE.txt file for this sample’s licensing information.
-
-Abstract:
-An object that manages a capture session and its inputs and outputs.
-*/
+ 이 샘플의 라이선스 정보는 LICENSE.txt 파일을 참조하세요.
+ 
+ 개요:
+ 캡처 세션과 입력 및 출력을 관리하는 객체.
+ */
 
 import Foundation
 import AVFoundation
 import Combine
 
-/// An actor that manages the capture pipeline, which includes the capture session, device inputs, and capture outputs.
-/// The app defines it as an `actor` type to ensure that all camera operations happen off of the `@MainActor`.
+/// 캡처 세션, 장치 입력 및 캡처 출력을 포함한 캡처 파이프라인을 관리하는 액터(actor).
+/// 앱은 이 타입을 `actor`로 정의하여 모든 카메라 작업이 `@MainActor` 외부에서 실행되도록 보장합니다.
 actor CaptureService {
     
-    /// A value that indicates whether the capture service is idle or capturing a photo or movie.
+    /// 캡처 서비스가 대기중인지, 캡처 중인지 나타내는 값.
     @Published private(set) var captureActivity: CaptureActivity = .idle
-    /// A value that indicates the current capture capabilities of the service.
+    /// 현재 캡처 서비스의 캡처 가능 상태를 나타내는 값.
     @Published private(set) var captureCapabilities = CaptureCapabilities.unknown
-    /// A Boolean value that indicates whether a higher priority event, like receiving a phone call, interrupts the app.
+    /// 전화 수신과 같은 높은 우선순위 이벤트로 인해 앱이 중단되었는지 여부를 나타내는 Boolean 값.
     @Published private(set) var isInterrupted = false
-    /// A Boolean value that indicates whether the user enables HDR video capture.
+    /// 사용자가 HDR 비디오 캡처를 활성화했는지 여부를 나타내는 Boolean 값.
     @Published var isHDRVideoEnabled = false
-    /// A Boolean value that indicates whether capture controls are in a fullscreen appearance.
+    /// 캡처 컨트롤이 전체 화면 모드로 표시되는지 여부를 나타내는 Boolean 값.
     @Published var isShowingFullscreenControls = false
     
-    /// A type that connects a preview destination with the capture session.
+    /// 미리보기 대상과 캡처 세션을 연결하는 타입.
     nonisolated let previewSource: PreviewSource
     
-    // The app's capture session.
+    // 앱의 캡처 세션.
     private let captureSession = AVCaptureSession()
     
-    // An object that manages the app's photo capture behavior.
+    // 사진 캡처 동작을 관리하는 객체.
     private let photoCapture = PhotoCapture()
     
-    // An object that manages the app's video capture behavior.
+    // 비디오 캡처 동작을 관리하는 객체.
     private let movieCapture = MovieCapture()
     
-    // An internal collection of output services.
+    // 내부적으로 사용되는 출력 서비스 컬렉션.
     private var outputServices: [any OutputService] { [photoCapture, movieCapture] }
     
-    // The video input for the currently selected device camera.
+    // 현재 선택된 카메라의 비디오 입력.
     private var activeVideoInput: AVCaptureDeviceInput?
     
-    // The mode of capture, either photo or video. Defaults to photo.
+    // 사진 또는 비디오 캡처 모드. 기본값은 사진 모드.
     private(set) var captureMode = CaptureMode.photo
     
-    // An object the service uses to retrieve capture devices.
+    // 캡처 장치를 검색하는 객체.
     private let deviceLookup = DeviceLookup()
     
-    // An object that monitors the state of the system-preferred camera.
+    // 시스템이 선호하는 카메라 상태를 모니터링하는 객체.
     private let systemPreferredCamera = SystemPreferredCameraObserver()
     
-    // An object that monitors video device rotations.
+    // 비디오 장치의 회전 상태를 모니터링하는 객체.
     private var rotationCoordinator: AVCaptureDevice.RotationCoordinator!
     private var rotationObservers = [AnyObject]()
     
-    // A Boolean value that indicates whether the actor finished its required configuration.
+    // 액터가 필요한 구성을 완료했는지 여부를 나타내는 Boolean 값.
     private var isSetUp = false
     
-    // A delegate object that responds to capture control activation and presentation events.
+    // 캡처 컨트롤 활성화 및 표시 이벤트에 응답하는 delegate 객체.
     private var controlsDelegate = CaptureControlsDelegate()
     
-    // A map that stores capture controls by device identifier.
+    // 기기 식별자를 기준으로 캡처 컨트롤을 저장하는 맵.
     private var controlsMap: [String: [AVCaptureControl]] = [:]
     
-    // A serial dispatch queue to use for capture control actions.
+    // 캡처 컨트롤 작업을 처리하는 직렬 디스패치 큐.
     private let sessionQueue = DispatchSerialQueue(label: "com.example.apple-samplecode.AVCam.sessionQueue")
     
-    // Sets the session queue as the actor's executor.
+    // 세션 큐를 액터의 실행기로 설정.
     nonisolated var unownedExecutor: UnownedSerialExecutor {
         sessionQueue.asUnownedSerialExecutor()
     }
     
     init() {
-        // Create a source object to connect the preview view with the capture session.
+        // 미리보기 뷰와 캡처 세션을 연결하는 소스 객체 생성.
         previewSource = DefaultPreviewSource(session: captureSession)
     }
     
-    // MARK: - Authorization
-    /// A Boolean value that indicates whether a person authorizes this app to use
-    /// device cameras and microphones. If they haven't previously authorized the
-    /// app, querying this property prompts them for authorization.
+    // MARK: - 권한 관리
+    /// 사용자가 이 앱이 기기의 카메라 및 마이크를 사용할 수 있도록 승인했는지 나타내는 Boolean 값.
+    /// 사용자가 이전에 승인하지 않았다면, 이 속성을 조회할 때 권한 요청 창이 표시됩니다.
     var isAuthorized: Bool {
         get async {
             let status = AVCaptureDevice.authorizationStatus(for: .video)
-            // Determine whether a person previously authorized camera access.
+            // 사용자가 이전에 카메라 접근을 승인했는지 확인.
             var isAuthorized = status == .authorized
-            // If the system hasn't determined their authorization status,
-            // explicitly prompt them for approval.
+            // 시스템이 아직 승인 상태를 결정하지 않았다면 권한 요청 창을 표시.
             if status == .notDetermined {
                 isAuthorized = await AVCaptureDevice.requestAccess(for: .video)
             }
@@ -95,59 +93,59 @@ actor CaptureService {
         }
     }
     
-    // MARK: - Capture session life cycle
+    // MARK: - 캡처 세션 life cycle
     func start(with state: CameraState) async throws {
-        // Set initial operating state.
+        // 초기 운영 상태 설정.
         captureMode = state.captureMode
         isHDRVideoEnabled = state.isVideoHDREnabled
         
-        // Exit early if not authorized or the session is already running.
+        // 권한이 없거나 세션이 이미 실행 중이라면 return.
         guard await isAuthorized, !captureSession.isRunning else { return }
-        // Configure the session and start it.
+        // 세션을 설정하고 실행 시작.
         try setUpSession()
         captureSession.startRunning()
     }
     
-    // MARK: - Capture setup
-    // Performs the initial capture session configuration.
+    // MARK: - 캡처 설정
+    // 초기 캡처 세션 구성을 수행.
     private func setUpSession() throws {
-        // Return early if already set up.
+        // 이미 설정된 경우 return.
         guard !isSetUp else { return }
-
-        // Observe internal state and notifications.
+        
+        // 내부 상태 및 알림 관찰.
         observeOutputServices()
         observeNotifications()
         observeCaptureControlsState()
         
         do {
-            // Retrieve the default camera and microphone.
+            // 기본 카메라 및 마이크 검색.
             let defaultCamera = try deviceLookup.defaultCamera
             let defaultMic = try deviceLookup.defaultMic
-
-            // Add inputs for the default camera and microphone devices.
+            
+            // 기본 카메라 및 마이크 입력 추가.
             activeVideoInput = try addInput(for: defaultCamera)
             try addInput(for: defaultMic)
-
-            // Configure the session preset based on the current capture mode.
+            
+            // 현재 캡처 모드에 따라 세션 프리셋 구성.
             captureSession.sessionPreset = captureMode == .photo ? .photo : .hd4K3840x2160
-            // Add the photo capture output as the default output type.
+            // 기본 출력 타입으로 사진 캡처 출력 추가.
             try addOutput(photoCapture.output)
-            // If the capture mode is set to Video, add a movie capture output.
+            // 캡처 모드가 비디오인 경우, 동영상 캡처 출력 추가.
             if captureMode == .video {
-                // Add the movie output as the default output type.
+                // 기본 출력 타입으로 동영상 출력 추가.
                 try addOutput(movieCapture.output)
                 setHDRVideoEnabled(isHDRVideoEnabled)
             }
             
-            // Configure controls to use with the Camera Control.
+            // 카메라 컨트롤에서 사용할 컨트롤 구성.
             configureControls(for: defaultCamera)
-            // Monitor the system-preferred camera state.
+            // 시스템이 선호하는 카메라 상태 모니터링.
             monitorSystemPreferredCamera()
-            // Configure a rotation coordinator for the default video device.
+            // 기본 비디오 기기를 위한 회전 코디네이터 구성.
             createRotationCoordinator(for: defaultCamera)
-            // Observe changes to the default camera's subject area.
+            // 기본 카메라의 피사체 영역 변경 사항을 감지.
             observeSubjectAreaChanges(of: defaultCamera)
-            // Update the service's advertised capabilities.
+            // 서비스의 지원 가능 기능 업데이트.
             updateCaptureCapabilities()
             
             isSetUp = true
@@ -155,8 +153,8 @@ actor CaptureService {
             throw CameraError.setupFailed
         }
     }
-
-    // Adds an input to the capture session to connect the specified capture device.
+    
+    // 캡처 장치를 캡처 세션에 입력으로 추가합니다.
     @discardableResult
     private func addInput(for device: AVCaptureDevice) throws -> AVCaptureDeviceInput {
         let input = try AVCaptureDeviceInput(device: device)
@@ -168,7 +166,7 @@ actor CaptureService {
         return input
     }
     
-    // Adds an output to the capture session to connect the specified capture device, if allowed.
+    // 지정된 캡처 장치를 캡처 세션에 출력으로 추가합니다.
     private func addOutput(_ output: AVCaptureOutput) throws {
         if captureSession.canAddOutput(output) {
             captureSession.addOutput(output)
@@ -177,96 +175,96 @@ actor CaptureService {
         }
     }
     
-    // The device for the active video input.
+    // 현재 활성 비디오 입력에 해당하는 장치.
     private var currentDevice: AVCaptureDevice {
         guard let device = activeVideoInput?.device else {
-            fatalError("No device found for current video input.")
+            fatalError("현재 비디오 입력에 대한 장치를 찾을 수 없습니다.")
         }
         return device
     }
     
-    // MARK: - Capture controls
+    // MARK: - 캡처 컨트롤
     
     private func configureControls(for device: AVCaptureDevice) {
         
-        // Exit early if the host device doesn't support capture controls.
+        // 호스트 장치가 캡처 컨트롤을 지원하지 않으면 조기 종료.
         guard captureSession.supportsControls else { return }
         
-        // Begin configuring the capture session.
+        // 캡처 세션 구성 시작.
         captureSession.beginConfiguration()
         
-        // Remove previously configured controls, if any.
+        // 기존에 설정된 컨트롤이 있다면 제거.
         for control in captureSession.controls {
             captureSession.removeControl(control)
         }
         
-        // Create controls and add them to the capture session.
+        // 새로운 컨트롤을 생성하고 캡처 세션에 추가.
         for control in createControls(for: device) {
             if captureSession.canAddControl(control) {
                 captureSession.addControl(control)
             } else {
-                logger.info("Unable to add control \(control).")
+                logger.info("컨트롤 \(control)를 추가할 수 없습니다.")
             }
         }
         
-        // Set the controls delegate.
+        // 컨트롤 delegate 설정.
         captureSession.setControlsDelegate(controlsDelegate, queue: sessionQueue)
         
-        // Commit the capture session configuration.
+        // 캡처 세션 구성 적용.
         captureSession.commitConfiguration()
     }
     
     func createControls(for device: AVCaptureDevice) -> [AVCaptureControl] {
-        // Retrieve the capture controls for this device, if they exist.
+        // 해당 장치에 대한 기존 캡처 컨트롤이 있으면 가져오기.
         guard let controls = controlsMap[device.uniqueID] else {
-            // Define the default controls.
+            // 기본 컨트롤 정의.
             var controls = [
                 AVCaptureSystemZoomSlider(device: device),
                 AVCaptureSystemExposureBiasSlider(device: device)
             ]
-            // Create a lens position control if the device supports setting a custom position.
+            // 장치가 사용자 지정 렌즈 위치 설정을 지원하는 경우 렌즈 위치 컨트롤 생성.
             if device.isLockingFocusWithCustomLensPositionSupported {
-                // Create a slider to adjust the value from 0 to 1.
+                // 0에서 1까지 값을 조정할 수 있는 슬라이더 생성.
                 let lensSlider = AVCaptureSlider("Lens Position", symbolName: "circle.dotted.circle", in: 0...1)
-                // Perform the slider's action on the session queue.
+                // 세션 큐에서 슬라이더의 동작 수행.
                 lensSlider.setActionQueue(sessionQueue) { lensPosition in
                     do {
                         try device.lockForConfiguration()
                         device.setFocusModeLocked(lensPosition: lensPosition)
                         device.unlockForConfiguration()
                     } catch {
-                        logger.info("Unable to change the lens position: \(error)")
+                        logger.info("렌즈 위치를 변경할 수 없습니다: \(error)")
                     }
                 }
-                // Add the slider the controls array.
+                // 컨트롤 배열에 슬라이더 추가.
                 controls.append(lensSlider)
             }
-            // Store the controls for future use.
+            // 이후 사용을 위해 컨트롤 저장.
             controlsMap[device.uniqueID] = controls
             return controls
         }
         
-        // Return the previously created controls.
+        // 기존에 생성된 컨트롤 반환.
         return controls
     }
     
-    // MARK: - Capture mode selection
+    // MARK: - 캡처 모드 선택
     
-    /// Changes the mode of capture, which can be `photo` or `video`.
+    /// 캡처 모드를 변경합니다. 모드는 `photo` 또는 `video`가 될 수 있습니다.
     ///
-    /// - Parameter `captureMode`: The capture mode to enable.
+    /// - Parameter `captureMode`: 활성화할 캡처 모드.
     func setCaptureMode(_ captureMode: CaptureMode) throws {
-        // Update the internal capture mode value before performing the session configuration.
+        // 세션 구성을 수행하기 전에 내부 캡처 모드 값을 업데이트합니다.
         self.captureMode = captureMode
         
-        // Change the configuration atomically.
+        // 설정 변경을 atomically 하게 수행합니다.
         captureSession.beginConfiguration()
         defer { captureSession.commitConfiguration() }
         
-        // Configure the capture session for the selected capture mode.
+        // 선택한 캡처 모드에 따라 캡처 세션을 구성합니다.
         switch captureMode {
         case .photo:
-            // The app needs to remove the movie capture output to perform Live Photo capture.
+            // Live Photo 촬영을 위해 동영상 캡처 출력을 제거해야 합니다.
             captureSession.sessionPreset = .photo
             captureSession.removeOutput(movieCapture.output)
         case .video:
@@ -276,106 +274,106 @@ actor CaptureService {
                 setHDRVideoEnabled(true)
             }
         }
-
-        // Update the advertised capabilities after reconfiguration.
+        
+        // 구성 변경 후 제공되는 기능을 업데이트합니다.
         updateCaptureCapabilities()
     }
     
-    // MARK: - Device selection
+    // MARK: - 장치 선택
     
-    /// Changes the capture device that provides video input.
+    /// 비디오 입력을 제공하는 캡처 장치를 변경합니다.
     ///
-    /// The app calls this method in response to the user tapping the button in the UI to change cameras.
-    /// The implementation switches between the front and back cameras and, in iPadOS,
-    /// connected external cameras.
+    /// 앱은 사용자가 UI에서 카메라 변경 버튼을 눌렀을 때 이 메서드를 호출합니다.
+    /// 이 구현은 전면 카메라와 후면 카메라 간 전환을 처리하며,
+    /// iPadOS에서는 연결된 외부 카메라도 지원합니다.
     func selectNextVideoDevice() {
-        // The array of available video capture devices.
+        // 사용 가능한 비디오 캡처 장치 목록.
         let videoDevices = deviceLookup.cameras
-
-        // Find the index of the currently selected video device.
+        
+        // 현재 선택된 비디오 장치의 인덱스를 찾습니다.
         let selectedIndex = videoDevices.firstIndex(of: currentDevice) ?? 0
-        // Get the next index.
+        // 다음 인덱스를 가져옵니다.
         var nextIndex = selectedIndex + 1
-        // Wrap around if the next index is invalid.
+        // 인덱스가 유효하지 않으면 처음으로 되돌립니다.
         if nextIndex == videoDevices.endIndex {
             nextIndex = 0
         }
         
         let nextDevice = videoDevices[nextIndex]
-        // Change the session's active capture device.
+        // 세션의 활성 캡처 장치를 변경합니다.
         changeCaptureDevice(to: nextDevice)
         
-        // The app only calls this method in response to the user requesting to switch cameras.
-        // Set the new selection as the user's preferred camera.
+        // 이 메서드는 사용자가 카메라 전환을 요청했을 때만 호출됩니다.
+        // 새 선택을 사용자의 기본 카메라로 설정합니다.
         AVCaptureDevice.userPreferredCamera = nextDevice
     }
     
-    // Changes the device the service uses for video capture.
+    // 비디오 캡처에 사용하는 장치를 변경합니다.
     private func changeCaptureDevice(to device: AVCaptureDevice) {
-        // The service must have a valid video input prior to calling this method.
+        // 이 메서드를 호출하기 전에 유효한 비디오 입력이 있어야 합니다.
         guard let currentInput = activeVideoInput else { fatalError() }
         
-        // Bracket the following configuration in a begin/commit configuration pair.
+        // 다음 설정을 begin/commit 구성 블록 내에서 수행합니다.
         captureSession.beginConfiguration()
         defer { captureSession.commitConfiguration() }
         
-        // Remove the existing video input before attempting to connect a new one.
+        // 새로운 입력을 연결하기 전에 기존 비디오 입력을 제거합니다.
         captureSession.removeInput(currentInput)
         do {
-            // Attempt to connect a new input and device to the capture session.
+            // 새로운 입력 및 장치를 캡처 세션에 연결하려 시도합니다.
             activeVideoInput = try addInput(for: device)
-            // Configure capture controls for new device selection.
+            // 새로운 장치에 대한 캡처 컨트롤을 구성합니다.
             configureControls(for: device)
-            // Configure a new rotation coordinator for the new device.
+            // 새로운 장치에 대한 회전 코디네이터를 설정합니다.
             createRotationCoordinator(for: device)
-            // Register for device observations.
+            // 장치 관찰을 등록합니다.
             observeSubjectAreaChanges(of: device)
-            // Update the service's advertised capabilities.
+            // 제공되는 기능을 업데이트합니다.
             updateCaptureCapabilities()
         } catch {
-            // Reconnect the existing camera on failure.
+            // 실패할 경우 기존 카메라를 다시 연결합니다.
             captureSession.addInput(currentInput)
         }
     }
     
-    /// Monitors changes to the system's preferred camera selection.
+    /// 시스템 기본 카메라 선택 변경을 모니터링합니다.
     ///
-    /// iPadOS supports external cameras. When someone connects an external camera to their iPad,
-    /// they're signaling the intent to use the device. The system responds by updating the
-    /// system-preferred camera (SPC) selection to this new device. When this occurs, if the SPC
-    /// isn't the currently selected camera, switch to the new device.
+    /// iPadOS는 외부 카메라를 지원합니다.
+    /// 사용자가 iPad에 외부 카메라를 연결하면 해당 장치를 사용하려는 의도로 간주됩니다.
+    /// 시스템은 이에 대응하여 시스템 기본 카메라(SPC) 선택을 새로운 장치로 업데이트합니다.
+    /// 이때, 현재 선택된 카메라가 SPC가 아니라면 새 장치로 전환합니다.
     private func monitorSystemPreferredCamera() {
         Task {
-            // An object monitors changes to system-preferred camera (SPC) value.
+            // 시스템 기본 카메라(SPC) 값 변경을 모니터링하는 객체입니다.
             for await camera in systemPreferredCamera.changes {
-                // If the SPC isn't the currently selected camera, attempt to change to that device.
+                // SPC가 현재 선택된 카메라가 아니라면 해당 장치로 변경을 시도합니다.
                 if let camera, currentDevice != camera {
-                    logger.debug("Switching camera selection to the system-preferred camera.")
+                    logger.debug("카메라 선택을 시스템에서 선호하는 카메라로 변경합니다.")
                     changeCaptureDevice(to: camera)
                 }
             }
         }
     }
     
-    // MARK: - Rotation handling
+    // MARK: - 회전 처리
     
-    /// Create a new rotation coordinator for the specified device and observe its state to monitor rotation changes.
+    /// 지정된 디바이스에 대한 새로운 회전 코디네이터를 생성하고 상태를 관찰하여 회전 변화를 감지합니다.
     private func createRotationCoordinator(for device: AVCaptureDevice) {
-        // Create a new rotation coordinator for this device.
+        // 해당 디바이스에 대한 새로운 회전 코디네이터를 생성합니다.
         rotationCoordinator = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: videoPreviewLayer)
         
-        // Set initial rotation state on the preview and output connections.
+        // 미리보기 및 출력 연결의 초기 회전 상태를 설정합니다.
         updatePreviewRotation(rotationCoordinator.videoRotationAngleForHorizonLevelPreview)
         updateCaptureRotation(rotationCoordinator.videoRotationAngleForHorizonLevelCapture)
         
-        // Cancel previous observations.
+        // 이전 관찰을 취소합니다.
         rotationObservers.removeAll()
         
-        // Add observers to monitor future changes.
+        // 회전 변화를 감지할 수 있도록 옵저버를 추가합니다.
         rotationObservers.append(
             rotationCoordinator.observe(\.videoRotationAngleForHorizonLevelPreview, options: .new) { [weak self] _, change in
                 guard let self, let angle = change.newValue else { return }
-                // Update the capture preview rotation.
+                // 미리보기 회전을 업데이트합니다.
                 Task { await self.updatePreviewRotation(angle) }
             }
         )
@@ -383,68 +381,72 @@ actor CaptureService {
         rotationObservers.append(
             rotationCoordinator.observe(\.videoRotationAngleForHorizonLevelCapture, options: .new) { [weak self] _, change in
                 guard let self, let angle = change.newValue else { return }
-                // Update the capture preview rotation.
+                // 촬영 시 회전 값을 업데이트합니다.
                 Task { await self.updateCaptureRotation(angle) }
             }
         )
     }
     
+    /// 미리보기 레이어의 회전 각도를 업데이트합니다.
     private func updatePreviewRotation(_ angle: CGFloat) {
         let previewLayer = videoPreviewLayer
         Task { @MainActor in
-            // Set initial rotation angle on the video preview.
+            // 비디오 미리보기의 초기 회전 각도를 설정합니다.
             previewLayer.connection?.videoRotationAngle = angle
         }
     }
     
+    /// 출력 서비스의 회전 각도를 업데이트합니다.
     private func updateCaptureRotation(_ angle: CGFloat) {
-        // Update the orientation for all output services.
+        // 모든 출력 서비스의 방향을 업데이트합니다.
         outputServices.forEach { $0.setVideoRotationAngle(angle) }
     }
     
+    /// 캡처 세션의 연결된 미리보기 레이어를 반환합니다.
     private var videoPreviewLayer: AVCaptureVideoPreviewLayer {
-        // Access the capture session's connected preview layer.
+        // 캡처 세션이 연결된 미리보기 레이어를 가져옵니다.
         guard let previewLayer = captureSession.connections.compactMap({ $0.videoPreviewLayer }).first else {
-            fatalError("The app is misconfigured. The capture session should have a connection to a preview layer.")
+            fatalError("앱이 잘못 구성되었습니다. 캡처 세션에는 미리보기 레이어와 연결된 객체가 있어야 합니다.")
         }
         return previewLayer
     }
     
-    // MARK: - Automatic focus and exposure
+    // MARK: - 자동 초점 및 노출
     
-    /// Performs a one-time automatic focus and expose operation.
+    /// 한 번만 실행되는 자동 초점 및 노출 조정 작업을 수행합니다.
     ///
-    /// The app calls this method as the result of a person tapping on the preview area.
+    /// 사용자가 미리보기 영역을 탭하면 이 메서드가 호출됩니다.
     func focusAndExpose(at point: CGPoint) {
-        // The point this call receives is in view-space coordinates. Convert this point to device coordinates.
+        // 전달된 좌표는 뷰 공간 기준이므로, 이를 디바이스 좌표로 변환합니다.
         let devicePoint = videoPreviewLayer.captureDevicePointConverted(fromLayerPoint: point)
         do {
-            // Perform a user-initiated focus and expose.
+            // 사용자 조작에 의해 초점 및 노출을 수행합니다.
             try focusAndExpose(at: devicePoint, isUserInitiated: true)
         } catch {
-            logger.debug("Unable to perform focus and exposure operation. \(error)")
+            logger.debug("초점 및 노출 조정 작업을 수행할 수 없습니다. \(error)")
         }
     }
     
-    // Observe notifications of type `subjectAreaDidChangeNotification` for the specified device.
+    /// 지정된 디바이스에 대해 `subjectAreaDidChangeNotification` 알림을 감지합니다.
     private func observeSubjectAreaChanges(of device: AVCaptureDevice) {
-        // Cancel the previous observation task.
+        // 이전의 관찰 작업을 취소합니다.
         subjectAreaChangeTask?.cancel()
         subjectAreaChangeTask = Task {
-            // Signal true when this notification occurs.
+            // 이 알림이 발생하면 true를 반환합니다.
             for await _ in NotificationCenter.default.notifications(named: AVCaptureDevice.subjectAreaDidChangeNotification, object: device).compactMap({ _ in true }) {
-                // Perform a system-initiated focus and expose.
+                // 시스템이 자동으로 초점 및 노출을 조정하도록 수행합니다.
                 try? focusAndExpose(at: CGPoint(x: 0.5, y: 0.5), isUserInitiated: false)
             }
         }
     }
     private var subjectAreaChangeTask: Task<Void, Never>?
     
+    /// 디바이스의 초점 및 노출을 조정합니다.
     private func focusAndExpose(at devicePoint: CGPoint, isUserInitiated: Bool) throws {
-        // Configure the current device.
+        // 현재 사용 중인 디바이스를 가져옵니다.
         let device = currentDevice
         
-        // The following mode and point of interest configuration requires obtaining an exclusive lock on the device.
+        // 아래의 모드 및 관심 지점 설정을 위해 디바이스의 독점 잠금이 필요합니다.
         try device.lockForConfiguration()
         
         let focusMode = isUserInitiated ? AVCaptureDevice.FocusMode.autoFocus : .continuousAutoFocus
@@ -458,39 +460,42 @@ actor CaptureService {
             device.exposurePointOfInterest = devicePoint
             device.exposureMode = exposureMode
         }
-        // Enable subject-area change monitoring when performing a user-initiated automatic focus and exposure operation.
-        // If this method enables change monitoring, when the device's subject area changes, the app calls this method a
-        // second time and resets the device to continuous automatic focus and exposure.
+        
+        // 사용자가 초점 및 노출 조정을 실행한 경우, 피사체 영역 변경 감지를 활성화합니다.
+        // 이를 통해 디바이스의 피사체 영역이 변경되면 이 메서드가 다시 호출되어 연속 자동 초점 및 노출로 재설정됩니다.
         device.isSubjectAreaChangeMonitoringEnabled = isUserInitiated
         
-        // Release the lock.
+        // 잠금을 해제합니다.
         device.unlockForConfiguration()
     }
     
-    // MARK: - Photo capture
+    // MARK: - 사진 촬영
+    
+    /// 사진을 캡처합니다.
     func capturePhoto(with features: PhotoFeatures) async throws -> Photo {
         try await photoCapture.capturePhoto(with: features)
     }
     
-    // MARK: - Movie capture
-    /// Starts recording video. The video records until the user stops recording,
-    /// which calls the following `stopRecording()` method.
+    // MARK: - 동영상 촬영
+    
+    /// 비디오 녹화를 시작합니다. 사용자가 녹화를 중지할 때까지 녹화가 계속됩니다.
+    /// 녹화를 중지하려면 `stopRecording()` 메서드를 호출합니다.
     func startRecording() {
         movieCapture.startRecording()
     }
     
-    /// Stops the recording and returns the captured movie.
+    /// 녹화를 중지하고 캡처된 영상을 반환합니다.
     func stopRecording() async throws -> Movie {
         try await movieCapture.stopRecording()
     }
     
-    /// Sets whether the app captures HDR video.
+    /// HDR 비디오 촬영 여부를 설정합니다.
     func setHDRVideoEnabled(_ isEnabled: Bool) {
-        // Bracket the following configuration in a begin/commit configuration pair.
+        // 아래 설정을 begin/commit 구성 블록 내에서 처리합니다.
         captureSession.beginConfiguration()
         defer { captureSession.commitConfiguration() }
         do {
-            // If the current device provides a 10-bit HDR format, enable it for use.
+            // 현재 디바이스가 10비트 HDR 포맷을 지원하는 경우 이를 활성화합니다.
             if isEnabled, let format = currentDevice.activeFormat10BitVariant {
                 try currentDevice.lockForConfiguration()
                 currentDevice.activeFormat = format
@@ -501,20 +506,21 @@ actor CaptureService {
                 isHDRVideoEnabled = false
             }
         } catch {
-            logger.error("Unable to obtain lock on device and can't enable HDR video capture.")
+            logger.error("장치를 lock 할 수 없어 HDR 비디오 촬영을 활성화할 수 없습니다.")
         }
     }
     
-    // MARK: - Internal state management
-    /// Updates the state of the actor to ensure its advertised capabilities are accurate.
+    // MARK: - 내부 상태 관리
+    
+    /// 액터의 상태를 업데이트하여 명시된 기능이 정확하도록 보장합니다.
     ///
-    /// When the capture session changes, such as changing modes or input devices, the service
-    /// calls this method to update its configuration and capabilities. The app uses this state to
-    /// determine which features to enable in the user interface.
+    /// 캡처 세션이 변경될 때(예: 모드 변경 또는 입력 장치 변경) 서비스는 이 메서드를 호출하여 설정 및 기능을 업데이트합니다.
+    /// 앱은 이 상태를 사용하여 사용자 인터페이스에서 어떤 기능을 활성화할지 결정합니다.
     private func updateCaptureCapabilities() {
-        // Update the output service configuration.
+        // 출력 서비스 설정을 업데이트합니다.
         outputServices.forEach { $0.updateConfiguration(for: currentDevice) }
-        // Set the capture service's capabilities for the selected mode.
+        
+        // 선택된 모드에 따라 캡처 서비스의 기능을 설정합니다.
         switch captureMode {
         case .photo:
             captureCapabilities = photoCapture.capabilities
@@ -523,32 +529,31 @@ actor CaptureService {
         }
     }
     
-    /// Merge the `captureActivity` values of the photo and movie capture services,
-    /// and assign the value to the actor's property.`
+    /// 사진 및 동영상 캡처 서비스의 `captureActivity` 값을 병합하여 액터의 속성에 할당합니다.
     private func observeOutputServices() {
         Publishers.Merge(photoCapture.$captureActivity, movieCapture.$captureActivity)
             .assign(to: &$captureActivity)
     }
     
-    /// Observe when capture control enter and exit a fullscreen appearance.
+    /// 캡처 컨트롤이 전체 화면 모드로 들어가거나 나올 때의 상태 변화를 감지합니다.
     private func observeCaptureControlsState() {
         controlsDelegate.$isShowingFullscreenControls
             .assign(to: &$isShowingFullscreenControls)
     }
     
-    /// Observe capture-related notifications.
+    /// 캡처와 관련된 알림을 감지합니다.
     private func observeNotifications() {
         Task {
             for await reason in NotificationCenter.default.notifications(named: AVCaptureSession.wasInterruptedNotification)
                 .compactMap({ $0.userInfo?[AVCaptureSessionInterruptionReasonKey] as AnyObject? })
                 .compactMap({ AVCaptureSession.InterruptionReason(rawValue: $0.integerValue) }) {
-                /// Set the `isInterrupted` state as appropriate.
+                /// `isInterrupted` 상태를 적절하게 설정합니다.
                 isInterrupted = [.audioDeviceInUseByAnotherClient, .videoDeviceInUseByAnotherClient].contains(reason)
             }
         }
         
         Task {
-            // Await notification of the end of an interruption.
+            // 중단이 종료되었을 때의 알림을 감지합니다.
             for await _ in NotificationCenter.default.notifications(named: AVCaptureSession.interruptionEndedNotification) {
                 isInterrupted = false
             }
@@ -557,7 +562,7 @@ actor CaptureService {
         Task {
             for await error in NotificationCenter.default.notifications(named: AVCaptureSession.runtimeErrorNotification)
                 .compactMap({ $0.userInfo?[AVCaptureSessionErrorKey] as? AVError }) {
-                // If the system resets media services, the capture session stops running.
+                // 시스템이 미디어 서비스를 재설정하면 캡처 세션이 중지될 수 있습니다.
                 if error.code == .mediaServicesWereReset {
                     if !captureSession.isRunning {
                         captureSession.startRunning()
@@ -571,22 +576,22 @@ actor CaptureService {
 class CaptureControlsDelegate: NSObject, AVCaptureSessionControlsDelegate {
     
     @Published private(set) var isShowingFullscreenControls = false
-
+    
     func sessionControlsDidBecomeActive(_ session: AVCaptureSession) {
-        logger.debug("Capture controls active.")
+        logger.debug("캡처 컨트롤이 활성화되었습니다.")
     }
-
+    
     func sessionControlsWillEnterFullscreenAppearance(_ session: AVCaptureSession) {
         isShowingFullscreenControls = true
-        logger.debug("Capture controls will enter fullscreen appearance.")
+        logger.debug("캡처 컨트롤이 전체 화면 모드로 전환됩니다.")
     }
     
     func sessionControlsWillExitFullscreenAppearance(_ session: AVCaptureSession) {
         isShowingFullscreenControls = false
-        logger.debug("Capture controls will exit fullscreen appearance.")
+        logger.debug("캡처 컨트롤이 전체 화면 모드를 종료합니다.")
     }
     
     func sessionControlsDidBecomeInactive(_ session: AVCaptureSession) {
-        logger.debug("Capture controls inactive.")
+        logger.debug("캡처 컨트롤이 비활성화되었습니다.")
     }
 }

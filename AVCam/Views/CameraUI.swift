@@ -1,16 +1,16 @@
 /*
-See the LICENSE.txt file for this sample’s licensing information.
-
-Abstract:
-A view that presents the main camera user interface.
-*/
+ 이 샘플의 라이선스 정보는 LICENSE.txt 파일을 참조하세요.
+ 
+ 개요:
+ 주요 카메라 사용자 인터페이스를 제공하는 뷰.
+ */
 
 import SwiftUI
 import AVFoundation
 
-/// A view that presents the main camera user interface.
+/// 주요 카메라 사용자 인터페이스를 제공하는 뷰.
 struct CameraUI<CameraModel: Camera>: PlatformView {
-
+    
     @State var camera: CameraModel
     @Binding var swipeDirection: SwipeDirection
     
@@ -40,7 +40,7 @@ struct CameraUI<CameraModel: Camera>: PlatformView {
         }
     }
     
-    /// This view arranges UI elements vertically.
+    /// UI 요소들을 수직으로 배치하는 뷰.
     @ViewBuilder
     var compactUI: some View {
         VStack(spacing: 0) {
@@ -52,18 +52,18 @@ struct CameraUI<CameraModel: Camera>: PlatformView {
         }
     }
     
-    /// This view arranges UI elements in a layered stack.
+    /// UI 요소들을 층별로 쌓는 뷰.
     @ViewBuilder
     var regularUI: some View {
         VStack {
             Spacer()
             ZStack {
                 CaptureModeView(camera: camera, direction: $swipeDirection)
-                    .offset(x: -250) // The vertical offset from center.
+                    .offset(x: -250) // 센터에서의 수직 오프셋.
                 MainToolbar(camera: camera)
                 FeaturesToolbar(camera: camera)
                     .frame(width: 250)
-                    .offset(x: 250) // The vertical offset from center.
+                    .offset(x: 250) // 센터에서의 수직 오프셋.
             }
             .frame(width: 740)
             .background(.ultraThinMaterial.opacity(0.8))
@@ -75,13 +75,13 @@ struct CameraUI<CameraModel: Camera>: PlatformView {
     var swipeGesture: some Gesture {
         DragGesture(minimumDistance: 50)
             .onEnded {
-                // Capture the swipe direction.
+                // 스와이프 방향 캡처.
                 swipeDirection = $0.translation.width < 0 ? .left : .right
             }
     }
     
     var bottomPadding: CGFloat {
-        // Dynamically calculate the offset for the bottom toolbar in iOS.
+        // iOS에서 하단 툴바의 오프셋을 동적으로 계산.
         let bounds = UIScreen.main.bounds
         let rect = AVMakeRect(aspectRatio: movieAspectRatio, insideRect: bounds)
         return (rect.minY.rounded() / 2) + 12
@@ -89,5 +89,5 @@ struct CameraUI<CameraModel: Camera>: PlatformView {
 }
 
 #Preview {
-    CameraUI(camera: PreviewCameraModel(), swipeDirection: .constant(.left))
+    CameraUI(camera: PreviewCameraModel(captureMode: .photo), swipeDirection: .constant(.left))
 }

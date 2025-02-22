@@ -1,9 +1,9 @@
 /*
-See the LICENSE.txt file for this sample’s licensing information.
-
-Abstract:
-A view that presents a video preview of the captured content.
-*/
+ 이 샘플의 라이선스 정보는 LICENSE.txt 파일을 참조하세요.
+ 
+ 개요:
+ 캡처된 콘텐츠의 비디오 미리보기를 제공하는 뷰.
+ */
 
 import SwiftUI
 @preconcurrency import AVFoundation
@@ -18,39 +18,39 @@ struct CameraPreview: UIViewRepresentable {
     
     func makeUIView(context: Context) -> PreviewView {
         let preview = PreviewView()
-        // Connect the preview layer to the capture session.
+        // 미리보기 레이어를 캡처 세션에 연결.
         source.connect(to: preview)
         return preview
     }
     
     func updateUIView(_ previewView: PreviewView, context: Context) {
-        // No-op.
+        // No-op (작업 없음).
     }
     
-    /// A class that presents the captured content.
+    /// 캡처된 콘텐츠를 표시하는 클래스.
     ///
-    /// This class owns the `AVCaptureVideoPreviewLayer` that presents the captured content.
+    /// 이 클래스는 캡처된 콘텐츠를 표시하는 `AVCaptureVideoPreviewLayer`를 소유합니다.
     ///
     class PreviewView: UIView, PreviewTarget {
         
         init() {
             super.init(frame: .zero)
-    #if targetEnvironment(simulator)
-            // The capture APIs require running on a real device. If running
-            // in Simulator, display a static image to represent the video feed.
+#if targetEnvironment(simulator)
+            // 캡처 API는 실제 장치에서 실행해야 합니다. 시뮬레이터에서 실행 중인 경우,
+            // 비디오 피드를 나타내기 위해 정적 이미지를 표시합니다.
             let imageView = UIImageView(frame: UIScreen.main.bounds)
             imageView.image = UIImage(named: "video_mode")
             imageView.contentMode = .scaleAspectFill
             imageView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
             addSubview(imageView)
-    #endif
+#endif
         }
         
         required init?(coder: NSCoder) {
             fatalError("init(coder:) has not been implemented")
         }
         
-        // Use the preview layer as the view's backing layer.
+        // 미리보기 레이어를 뷰의 백업 레이어로 사용.
         override class var layerClass: AnyClass {
             AVCaptureVideoPreviewLayer.self
         }
@@ -60,8 +60,8 @@ struct CameraPreview: UIViewRepresentable {
         }
         
         nonisolated func setSession(_ session: AVCaptureSession) {
-            // Connects the session with the preview layer, which allows the layer
-            // to provide a live view of the captured content.
+            // 캡처 세션을 미리보기 레이어에 연결하여,
+            // 레이어가 캡처된 콘텐츠의 실시간 뷰를 제공할 수 있도록 합니다.
             Task { @MainActor in
                 previewLayer.session = session
             }
@@ -69,24 +69,23 @@ struct CameraPreview: UIViewRepresentable {
     }
 }
 
-/// A protocol that enables a preview source to connect to a preview target.
+/// 미리보기 소스가 미리보기 대상을 연결할 수 있도록 하는 프로토콜.
 ///
-/// The app provides an instance of this type to the client tier so it can connect
-/// the capture session to the `PreviewView` view. It uses these protocols
-/// to prevent explicitly exposing the capture objects to the UI layer.
-///
+/// 앱은 이 유형의 인스턴스를 클라이언트 계층에 제공하여
+/// 캡처 세션을 `PreviewView` 뷰에 연결할 수 있게 합니다.
+/// 캡처 객체를 UI 레이어에 명시적으로 노출하는 것을 방지하기 위해 이 프로토콜을 사용합니다.
 protocol PreviewSource: Sendable {
-    // Connects a preview destination to this source.
+    // 미리보기 대상을 이 소스에 연결.
     func connect(to target: PreviewTarget)
 }
 
-/// A protocol that passes the app's capture session to the `CameraPreview` view.
+/// 앱의 캡처 세션을 `CameraPreview` 뷰에 전달하는 프로토콜.
 protocol PreviewTarget {
-    // Sets the capture session on the destination.
+    // 대상을 위한 캡처 세션을 설정.
     func setSession(_ session: AVCaptureSession)
 }
 
-/// The app's default `PreviewSource` implementation.
+/// 앱의 기본 `PreviewSource` 구현.
 struct DefaultPreviewSource: PreviewSource {
     
     private let session: AVCaptureSession

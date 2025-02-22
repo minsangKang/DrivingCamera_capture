@@ -1,9 +1,9 @@
 /*
-See the LICENSE.txt file for this sample’s licensing information.
-
-Abstract:
-An object that manages a photo capture output to take photographs.
-*/
+ 이 샘플의 라이선스 정보는 LICENSE.txt 파일을 참조하세요.
+ 
+ 개요:
+ 사진 촬영을 수행하는 객체로, 사진 캡처 출력을 관리합니다.
+ */
 
 import AVFoundation
 import CoreImage
@@ -12,69 +12,67 @@ enum PhotoCaptureError: Error {
     case noPhotoData
 }
 
-/// An object that manages a photo capture output to perform take photographs.
+/// 사진 캡처 출력을 관리하여 사진을 촬영하는 객체.
 final class PhotoCapture: OutputService {
     
-    /// A value that indicates the current state of photo capture.
+    /// 현재 사진 캡처 상태를 나타내는 값.
     @Published private(set) var captureActivity: CaptureActivity = .idle
     
-    /// The capture output type for this service.
+    /// 이 서비스의 캡처 출력 유형.
     let output = AVCapturePhotoOutput()
     
-    // An internal alias for the output.
+    // 출력에 대한 내부 별칭.
     private var photoOutput: AVCapturePhotoOutput { output }
     
-    // The current capabilities available.
+    // 현재 사용 가능한 기능들.
     private(set) var capabilities: CaptureCapabilities = .unknown
     
-    // A count of Live Photo captures currently in progress.
+    // 현재 진행 중인 Live Photo 캡처의 수.
     private var livePhotoCount = 0
     
-    // MARK: - Capture a photo.
+    // MARK: - 사진 캡처.
     
-    /// The app calls this method when the user taps the photo capture button.
+    /// 사용자가 사진 캡처 버튼을 누르면 호출되는 메서드.
     func capturePhoto(with features: PhotoFeatures) async throws -> Photo {
-        // Wrap the delegate-based capture API in a continuation to use it in an async context.
+        // delegate 기반 캡처 API를 비동기 컨텍스트에서 사용하기 위해 continuation으로 래핑합니다.
         try await withCheckedThrowingContinuation { continuation in
             
-            // Create a settings object to configure the photo capture.
+            // 사진 캡처를 구성하는 설정 객체 생성.
             let photoSettings = createPhotoSettings(with: features)
             
             let delegate = PhotoCaptureDelegate(continuation: continuation)
             monitorProgress(of: delegate)
             
-            // Capture a new photo with the specified settings.
+            // 지정된 설정으로 새 사진을 캡처합니다.
             photoOutput.capturePhoto(with: photoSettings, delegate: delegate)
         }
     }
     
-    // MARK: - Create a photo settings object.
+    // MARK: - 사진 설정 객체 생성.
     
-    // Create a photo settings object with the features a person enables in the UI.
+    // 사용자가 UI에서 활성화한 기능으로 사진 설정 객체를 생성합니다.
     private func createPhotoSettings(with features: PhotoFeatures) -> AVCapturePhotoSettings {
-        // Create a new settings object to configure the photo capture.
+        // 사진 캡처를 구성할 새로운 설정 객체 생성.
         var photoSettings = AVCapturePhotoSettings()
         
-        // Capture photos in HEIF format when the device supports it.
+        // 장치가 지원하면 HEIF 형식으로 사진을 캡처합니다.
         if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
             photoSettings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
         }
         
-        /// Set the format of the preview image to capture. The `photoSettings` object returns the available
-        /// preview format types in order of compatibility with the primary image.
+        /// 캡처할 미리보기 이미지의 형식을 설정합니다. `photoSettings` 객체는 기본 이미지와의 호환성에 따라 사용 가능한 미리보기 형식 유형을 반환합니다.
         if let previewPhotoPixelFormatType = photoSettings.availablePreviewPhotoPixelFormatTypes.first {
             photoSettings.previewPhotoFormat = [kCVPixelBufferPixelFormatTypeKey as String: previewPhotoPixelFormatType]
         }
         
-        /// Set the largest dimensions that the photo output supports.
-        /// `CaptureService` automatically updates the photo output's `maxPhotoDimensions`
-        /// when the capture pipeline changes.
+        /// 사진 출력이 지원하는 최대 차원으로 설정합니다.
+        /// `CaptureService`는 캡처 파이프라인이 변경될 때마다 사진 출력의 `maxPhotoDimensions`를 자동으로 업데이트합니다.
         photoSettings.maxPhotoDimensions = photoOutput.maxPhotoDimensions
         
-        // Set the movie URL if the photo output supports Live Photo capture.
+        // 사진 출력이 Live Photo 캡처를 지원하는 경우 영상 파일 URL을 설정합니다.
         photoSettings.livePhotoMovieFileURL = features.isLivePhotoEnabled ? URL.movieFileURL : nil
         
-        // Set the priority of speed versus quality during this capture.
+        // 이 캡처에서 속도와 품질 중 우선순위를 설정합니다.
         if let prioritization = AVCapturePhotoOutput.QualityPrioritization(rawValue: features.qualityPrioritization.rawValue) {
             photoSettings.photoQualityPrioritization = prioritization
         }
@@ -82,26 +80,26 @@ final class PhotoCapture: OutputService {
         return photoSettings
     }
     
-    /// Monitors the progress of a photo capture delegate.
+    /// 사진 캡처 대리자의 진행 상황을 모니터링합니다.
     ///
-    /// The `PhotoCaptureDelegate` produces an asynchronous stream of values that indicate its current activity.
-    /// The app propagates the activity values up to the view tier so the UI can update accordingly.
+    /// `PhotoCaptureDelegate`는 현재 진행 상태를 나타내는 값들의 비동기 스트림을 생성합니다.
+    /// 앱은 활동 값을 뷰 계층으로 전달하여 UI가 적절히 업데이트되도록 합니다.
     private func monitorProgress(of delegate: PhotoCaptureDelegate, isolation: isolated (any Actor)? = #isolation) {
         Task {
             _ = isolation
             var isLivePhoto = false
-            // Asynchronously monitor the activity of the delegate while the system performs capture.
+            // 시스템이 캡처를 수행하는 동안 대리자의 활동을 비동기적으로 모니터링합니다.
             for await activity in delegate.activityStream {
                 var currentActivity = activity
-                /// More than one activity value for the delegate may report that `isLivePhoto` is `true`.
-                /// Only increment/decrement the count when the value changes from its previous state.
+                /// 대리자의 활동 값이 여러 번 `isLivePhoto`가 `true`일 수 있습니다.
+                /// 값이 이전 상태에서 변경될 때만 카운트를 증가/감소시킵니다.
                 if activity.isLivePhoto != isLivePhoto {
                     isLivePhoto = activity.isLivePhoto
-                    // Increment or decrement as appropriate.
+                    // 적절히 증가 또는 감소시킵니다.
                     livePhotoCount += isLivePhoto ? 1 : -1
                     if livePhotoCount > 1 {
-                        /// Set `isLivePhoto` to `true` when there are concurrent Live Photos in progress.
-                        /// This prevents the "Live" badge in the UI from flickering.
+                        /// 동시에 여러 개의 Live Photo가 진행 중일 때 `isLivePhoto`를 `true`로 설정합니다.
+                        /// 이렇게 하면 UI에서 "Live" 배지가 깜박이지 않도록 방지할 수 있습니다.
                         currentActivity = .photoCapture(willCapture: activity.willCapture, isLivePhoto: true)
                     }
                 }
@@ -110,14 +108,14 @@ final class PhotoCapture: OutputService {
         }
     }
     
-    // MARK: - Update the photo output configuration
+    // MARK: - 사진 출력 구성 업데이트
     
-    /// Reconfigures the photo output and updates the output service's capabilities accordingly.
+    /// 사진 출력을 재구성하고 출력 서비스의 기능을 그에 맞게 업데이트합니다.
     ///
-    /// The `CaptureService` calls this method whenever you change cameras.
+    /// `CaptureService`는 카메라를 변경할 때마다 이 메서드를 호출합니다.
     ///
     func updateConfiguration(for device: AVCaptureDevice) {
-        // Enable all supported features.
+        // 지원하는 모든 기능을 활성화합니다.
         photoOutput.maxPhotoDimensions = device.activeFormat.supportedMaxPhotoDimensions.last ?? .zero
         photoOutput.isLivePhotoCaptureEnabled = photoOutput.isLivePhotoCaptureSupported
         photoOutput.maxPhotoQualityPrioritization = .quality
@@ -134,11 +132,11 @@ final class PhotoCapture: OutputService {
 
 typealias PhotoContinuation = CheckedContinuation<Photo, Error>
 
-// MARK: - A photo capture delegate to process the captured photo.
+// MARK: - 캡처된 사진을 처리할 사진 캡처 대리자.
 
-/// An object that adopts the `AVCapturePhotoCaptureDelegate` protocol to respond to photo capture life-cycle events.
+/// `AVCapturePhotoCaptureDelegate` 프로토콜을 채택하여 사진 캡처 생애 주기 이벤트에 응답하는 객체.
 ///
-/// The delegate produces a stream of events that indicate its current state of processing.
+/// 이 대리자는 현재 처리 상태를 나타내는 이벤트 스트림을 생성합니다.
 private class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
     
     private let continuation: PhotoContinuation
@@ -149,11 +147,11 @@ private class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
     private var photoData: Data?
     private var livePhotoMovieURL: URL?
     
-    /// A stream of capture activity values that indicate the current state of progress.
+    /// 진행 상태를 나타내는 캡처 활동 값 스트림.
     let activityStream: AsyncStream<CaptureActivity>
     private let activityContinuation: AsyncStream<CaptureActivity>.Continuation
     
-    /// Creates a new delegate object with the checked continuation to call when processing is complete.
+    /// 처리 완료 시 호출할 확인된 continuation을 사용하여 새로운 대리자 객체를 생성합니다.
     init(continuation: PhotoContinuation) {
         self.continuation = continuation
         
@@ -163,68 +161,68 @@ private class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
     }
     
     func photoOutput(_ output: AVCapturePhotoOutput, willBeginCaptureFor resolvedSettings: AVCaptureResolvedPhotoSettings) {
-        // Determine if this is a live capture.
+        // Live Photo 캡처인지 여부를 확인합니다.
         isLivePhoto = resolvedSettings.livePhotoMovieDimensions != .zero
         activityContinuation.yield(.photoCapture(isLivePhoto: isLivePhoto))
     }
     
     func photoOutput(_ output: AVCapturePhotoOutput, willCapturePhotoFor resolvedSettings: AVCaptureResolvedPhotoSettings) {
-        // Signal that a capture is beginning.
+        // 캡처가 시작될 것임을 신호로 보냅니다.
         activityContinuation.yield(.photoCapture(willCapture: true, isLivePhoto: isLivePhoto))
     }
     
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishRecordingLivePhotoMovieForEventualFileAt outputFileURL: URL, resolvedSettings: AVCaptureResolvedPhotoSettings) {
-        // Indicates that Live Photo capture is over.
+        // Live Photo 캡처가 끝났음을 나타냅니다.
         activityContinuation.yield(.photoCapture(isLivePhoto: false))
     }
     
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingLivePhotoToMovieFileAt outputFileURL: URL, duration: CMTime, photoDisplayTime: CMTime, resolvedSettings: AVCaptureResolvedPhotoSettings, error: Error?) {
         if let error {
-            logger.debug("Error processing Live Photo companion movie: \(String(describing: error))")
+            logger.debug("Live Photo 동영상 처리 오류: \(String(describing: error))")
         }
         livePhotoMovieURL = outputFileURL
     }
     
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishCapturingDeferredPhotoProxy deferredPhotoProxy: AVCaptureDeferredPhotoProxy?, error: Error?) {
         if let error = error {
-            logger.debug("Error capturing deferred photo: \(error)")
+            logger.debug("지연된 사진 캡처 오류: \(error)")
             return
         }
-        // Capture the data for this photo.
+        // 이 사진의 데이터를 캡처합니다.
         photoData = deferredPhotoProxy?.fileDataRepresentation()
         isProxyPhoto = true
     }
     
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         if let error = error {
-            logger.debug("Error capturing photo: \(String(describing: error))")
+            logger.debug("사진 캡처 오류: \(String(describing: error))")
             return
         }
         photoData = photo.fileDataRepresentation()
     }
     
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishCaptureFor resolvedSettings: AVCaptureResolvedPhotoSettings, error: Error?) {
-
+        
         defer {
-            /// Finish the continuation to terminate the activity stream.
+            /// 활동 스트림을 종료하기 위해 continuation을 완료합니다.
             activityContinuation.finish()
         }
-
-        // If an error occurs, resume the continuation by throwing an error, and return.
+        
+        // 오류가 발생하면 continuation을 재개하여 오류를 던지고 반환합니다.
         if let error {
             continuation.resume(throwing: error)
             return
         }
         
-        // If the app captures no photo data, resume the continuation by throwing an error, and return.
+        // 사진 데이터가 없으면 continuation을 재개하여 오류를 던지고 반환합니다.
         guard let photoData else {
             continuation.resume(throwing: PhotoCaptureError.noPhotoData)
             return
         }
         
-        /// Create a photo object to save to the `MediaLibrary`.
+        /// `MediaLibrary`에 저장할 사진 객체를 생성합니다.
         let photo = Photo(data: photoData, isProxy: isProxyPhoto, livePhotoMovieURL: livePhotoMovieURL)
-        // Resume the continuation by returning the captured photo.
+        // 캡처된 사진을 반환하기 위해 continuation을 재개합니다.
         continuation.resume(returning: photo)
     }
 }
